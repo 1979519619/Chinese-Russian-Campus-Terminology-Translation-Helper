@@ -14,23 +14,54 @@ The initial 40 records are all marked `demo`. They are engineering samples and m
 
 Project repository: <https://github.com/1979519619/Chinese-Russian-Campus-Terminology-Translation-Helper>
 
-### Local Windows start
+### First-time Windows setup
 
-The tested runtime keeps models and cache under `F:\LT-Campus-MVP\runtime` to avoid non-ASCII native model paths. From the repository root:
+Requirements: 64-bit Python 3.12, PowerShell 5.1 or later, an internet connection for the first installation, and at least 2 GiB free on the runtime drive. The locked environment currently occupies about 0.85 GiB. Models, the virtual environment and caches are local runtime data and are intentionally excluded from Git.
+
+From the repository root, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-campus-mvp.ps1
+```
+
+The setup performs a storage preflight before writing. It defaults to `F:\LT-Campus-MVP\runtime` when drive F is available, otherwise to an ASCII-only path on the system drive. An ASCII-only runtime path is required because SentencePiece is unreliable with non-ASCII model paths on Windows. Override the location with `-RuntimeRoot` when necessary.
+
+### Everyday start
+
+Double-click `scripts\start-campus-mvp.cmd`, or run this from the repository root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run-campus-mvp.ps1
 ```
 
-Open <http://127.0.0.1:5000>. Use `-Port 5001` when port 5000 is already occupied.
+The double-click launcher opens <http://127.0.0.1:5000> after the local service becomes healthy. Keep its PowerShell window open while using the assistant; press `Ctrl+C` to stop it. Use `-Port 5001` when port 5000 is already occupied.
 
-### Tests
+### Automatic verification
 
 ```powershell
-..\runtime\.venv\Scripts\python.exe .\libretranslate\tests\test_campus_glossary.py -v
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-campus-mvp.ps1
 ```
 
-The current core suite contains 30 tests. Model-backed API and page evidence is recorded outside the repository in the versioned acceptance-evidence folder.
+The verifier checks dependencies and the exact four-model set, runs all 30 core tests, launches an isolated service on port 5002, evaluates all 40 glossary records, verifies ordinary-text behavior, and confirms that a unique request-text sentinel did not appear in server logs. Small reports are written to the ignored `artifacts\verification` directory.
+
+### Clean Windows VM reproduction before publishing
+
+The project can be tested before it is pushed to GitHub by transferring a Git Bundle to a clean Windows VM:
+
+```powershell
+git bundle create .\campus-mvp.bundle feature/minimum-mvp
+```
+
+Copy `campus-mvp.bundle` to the VM, then run:
+
+```powershell
+git clone .\campus-mvp.bundle campus-mvp
+Set-Location .\campus-mvp
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-campus-mvp.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-campus-mvp.ps1
+```
+
+For the offline acceptance check, finish setup once while connected, disconnect the VM network, and run the verifier again. Do not copy the host virtual environment, model directory, pip cache or `.campus-mvp.local.json` into the VM. G7 is complete only after this clean-environment run passes; preparing the scripts on the development computer is not sufficient evidence by itself.
 
 ### Modification and AI disclosure
 
