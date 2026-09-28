@@ -6,6 +6,36 @@
 
 Free and Open Source Machine Translation API, entirely self-hosted. Unlike other APIs, it doesn't rely on proprietary software such as Google or Azure to perform translations. Instead, its translation engine is powered by the open source [Argos Translate](https://github.com/argosopentech/argos-translate) library.
 
+## Chinese-Russian Campus Terminology Translation Helper MVP
+
+This repository adds an optional, local-first Chinese-Russian campus glossary to LibreTranslate. The MVP keeps ordinary translation unchanged by default. When `use_glossary` is enabled for a supported plain-text language pair, exact glossary matches are protected during translation, restored to the designated term and returned as `matchedTerms` with category, source and review status.
+
+The initial 40 records are all marked `demo`. They are engineering samples and must not be described as official school translations. The web interface repeats this notice and provides read-only browsing only.
+
+Project repository: <https://github.com/1979519619/Chinese-Russian-Campus-Terminology-Translation-Helper>
+
+### Local Windows start
+
+The tested runtime keeps models and cache under `F:\LT-Campus-MVP\runtime` to avoid non-ASCII native model paths. From the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-campus-mvp.ps1
+```
+
+Open <http://127.0.0.1:5000>. Use `-Port 5001` when port 5000 is already occupied.
+
+### Tests
+
+```powershell
+..\runtime\.venv\Scripts\python.exe .\libretranslate\tests\test_campus_glossary.py -v
+```
+
+The current core suite contains 30 tests. Model-backed API and page evidence is recorded outside the repository in the versioned acceptance-evidence folder.
+
+### Modification and AI disclosure
+
+MVP-specific changes are limited to the glossary data and matching module, optional `/translate` parameters, safe placeholder fallback, a read-only glossary endpoint, the web switch and match display, tests, documentation and the Windows launcher. AI assistance was used for planning, implementation drafts, debugging and test orchestration. The project owner remains responsible for reviewing terminology, source claims, licensing, test results and the final submission. No pull request or issue is created automatically.
+
 ![Translation](https://github.com/user-attachments/assets/457696b5-dbff-40ab-a18e-7bfb152c5121)
 
 ## Getting Started
