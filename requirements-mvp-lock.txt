@@ -1,4 +1,5 @@
-# Windows x64 / CPython 3.12 lock used by scripts/setup-campus-mvp.ps1.
+# Reproducible MVP dependency lock used by the Windows and Ubuntu setup scripts.
+# Verified on Windows x64 / CPython 3.12; Ubuntu x86_64 / CPython 3.10-3.12 is the pending G7 target.
 # Install with --no-deps so future resolver changes cannot silently alter it.
 APScheduler==3.11.2
 argos-translate-files==1.4.4

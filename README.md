@@ -63,6 +63,27 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-campus-mvp.ps1
 
 For the offline acceptance check, finish setup once while connected, disconnect the VM network, and run the verifier again. Do not copy the host virtual environment, model directory, pip cache or `.campus-mvp.local.json` into the VM. G7 is complete only after this clean-environment run passes; preparing the scripts on the development computer is not sufficient evidence by itself.
 
+### Clean Ubuntu VM reproduction (lower-storage route)
+
+An existing Ubuntu x86_64 VM can be used instead of creating a second Windows VM. The Linux setup accepts Python 3.10, 3.11 or 3.12 and keeps its complete runtime under `~/CampusMVP/runtime` by default.
+
+After cloning the Git Bundle in the clean VM:
+
+```bash
+chmod +x scripts/*campus-mvp*.sh
+./scripts/setup-campus-mvp.sh --validate-only
+./scripts/setup-campus-mvp.sh
+./scripts/verify-campus-mvp.sh
+```
+
+Start the local page with:
+
+```bash
+./scripts/start-campus-mvp-linux.sh
+```
+
+The setup performs a 2 GiB free-space gate before writing, creates an isolated virtual environment, installs the locked dependencies and exact four-model set, and runs the core tests. The verifier uses port 5002 temporarily and stops only its own process. For G7, repeat the verifier once with the VM network disconnected. See `docs/G7_CLEAN_UBUNTU_VM_VERIFICATION.md` for the evidence checklist. Linux support remains unverified until that clean-VM procedure succeeds.
+
 ### Modification and AI disclosure
 
 MVP-specific changes are limited to the glossary data and matching module, optional `/translate` parameters, safe placeholder fallback, a read-only glossary endpoint, the web switch and match display, tests, documentation and the Windows launcher. AI assistance was used for planning, implementation drafts, debugging and test orchestration. The project owner remains responsible for reviewing terminology, source claims, licensing, test results and the final submission. No pull request or issue is created automatically.
