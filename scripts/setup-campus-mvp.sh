@@ -120,9 +120,21 @@ export TMPDIR="$TEMPORARY_PATH"
 export PYTHONIOENCODING=utf-8
 
 VENV_PYTHON="$VENV_PATH/bin/python"
+VENV_NEEDS_REBUILD=0
 if [[ ! -x "$VENV_PYTHON" ]]; then
-    echo "Creating Python virtual environment at $VENV_PATH"
-    if ! "$BASE_PYTHON" -m venv "$VENV_PATH"; then
+    VENV_NEEDS_REBUILD=1
+elif ! "$VENV_PYTHON" -m pip --version >/dev/null 2>&1; then
+    VENV_NEEDS_REBUILD=1
+fi
+if ((VENV_NEEDS_REBUILD)); then
+    VENV_ARGUMENTS=()
+    if [[ -d "$VENV_PATH" ]]; then
+        echo "Repairing incomplete Python virtual environment at $VENV_PATH"
+        VENV_ARGUMENTS+=(--clear)
+    else
+        echo "Creating Python virtual environment at $VENV_PATH"
+    fi
+    if ! "$BASE_PYTHON" -m venv "${VENV_ARGUMENTS[@]}" "$VENV_PATH"; then
         PYTHON_MINOR="$($BASE_PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
         echo "The Python venv module is unavailable." >&2
         echo "Install it with: sudo apt update && sudo apt install -y python${PYTHON_MINOR}-venv" >&2
