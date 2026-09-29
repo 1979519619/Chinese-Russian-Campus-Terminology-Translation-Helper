@@ -162,9 +162,10 @@ document.addEventListener('DOMContentLoaded', function(){
             glossaryAvailable: function(){
                 var sourceIsChinese = this.sourceLang === "zh" || this.sourceLang === "zh-Hans";
                 var targetIsChinese = this.targetLang === "zh" || this.targetLang === "zh-Hans";
+                var sourceIsAuto = this.sourceLang === "auto";
                 return !this.isHtml && (
-                    (sourceIsChinese && this.targetLang === "ru") ||
-                    (this.sourceLang === "ru" && targetIsChinese)
+                    ((sourceIsChinese || sourceIsAuto) && this.targetLang === "ru") ||
+                    ((this.sourceLang === "ru" || sourceIsAuto) && targetIsChinese)
                 );
             },
             canSendSuggestion: function(){
