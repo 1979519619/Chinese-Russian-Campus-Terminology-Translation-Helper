@@ -64,6 +64,7 @@ $env:ARGOS_PACKAGES_DIR = $argosPackagesPath
 $env:TEMP = $temporaryPath
 $env:TMP = $temporaryPath
 $env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONPATH = if ($env:PYTHONPATH) { "$repositoryRoot;$($env:PYTHONPATH)" } else { $repositoryRoot }
 
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $reportPath = Join-Path $OutputDirectory "campus-mvp-$timestamp.json"
