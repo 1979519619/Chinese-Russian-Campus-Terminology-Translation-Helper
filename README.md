@@ -1,3 +1,17 @@
+# Chinese-Russian Campus Terminology Translation Helper（中俄校园术语翻译助手）
+
+基于 LibreTranslate 的校园中俄翻译助手：在翻译管线中加入「校园术语增强层」，命中的术语以固定译法输出并展示分类与出处，全部组件本地部署、断网可用。
+
+- 术语库数据：`libretranslate/glossaries/campus_zh_ru.json`（40 条中俄双向记录，字段说明见 `docs/术语库字段说明.md`）
+- 开发状态与验收记录：`docs/MVP_STATUS.md`
+- 术语出处说明：`docs/术语出处参考.md`
+- 一键自动核验：`scripts/verify-campus-mvp.sh`（Windows 为 `scripts/verify-campus-mvp.ps1`），检查内容见 `docs/验证与复现指南.md`
+- Web 界面：翻译页提供「校园术语库」开关（默认关闭）、命中术语展示与只读词表浏览
+
+以下为上游 LibreTranslate 的原始说明。
+
+---
+
 # LibreTranslate
 
 [Try it online!](https://libretranslate.com) | [API Docs](https://docs.libretranslate.com) | [Community Forum](https://community.libretranslate.com/) | [Bluesky](https://bsky.app/profile/libretranslate.com)
