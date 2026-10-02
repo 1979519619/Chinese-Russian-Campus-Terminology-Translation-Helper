@@ -1,7 +1,6 @@
 # Minimum MVP development status
 
 Status: **IN PROGRESS**
-
 ## Repository baseline
 
 - Upstream: `https://github.com/LibreTranslate/LibreTranslate.git`
@@ -46,5 +45,5 @@ Set the runtime environment to the ASCII-only model location on `F:` and run Lib
 
 ## Still required before the whole Exit Gate passes
 
-- Reproduce the documented setup on another clean environment.
+- ~~Reproduce the documented setup on another clean environment.~~ Done 2026-10-02: fresh clone from the final bundle (commit `037b1ff`) reproduced on the clean Ubuntu VM with reused Argos models — online and offline verification both reached VERIFY_PASS (30/30 unit tests, 40/40 term adoption, ordinary-text regression PASS, privacy log sentinel PASS). See the G7 re-verification report under project acceptance evidence.
 - Complete submission materials and owner review.
