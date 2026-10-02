@@ -461,6 +461,60 @@ textarea:disabled{
   opacity: 0.5;
 }
 
+.campus-glossary-controls {
+  margin: 0.5rem 0 0.75rem;
+}
+
+.campus-glossary-switch {
+  display: inline-block;
+  margin-right: 0.75rem;
+}
+
+.campus-glossary-browse {
+  color: var(--accent-color);
+  text-transform: none;
+}
+
+.campus-glossary-note {
+  color: var(--fg-color);
+  font-size: 0.9rem;
+  margin: 0.35rem 0 0;
+  opacity: 0.75;
+}
+
+.campus-glossary-panel {
+  background: var(--sec-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin: 0 0 1rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.75rem 0.5rem;
+}
+
+.campus-glossary-panel h5 {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+}
+
+.campus-term-card {
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0.55rem 0;
+}
+
+.campus-term-card:last-child {
+  border-bottom: none;
+}
+
+.campus-term-card span {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
 @media (min-width: 280px) {
   .btn-text {
     display: inline;

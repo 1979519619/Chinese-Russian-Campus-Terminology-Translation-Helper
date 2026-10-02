@@ -1,4 +1,5 @@
 import io
+import logging
 import math
 import os
 import re
@@ -23,6 +24,12 @@ from werkzeug.http import http_date
 from werkzeug.utils import secure_filename
 
 from libretranslate import flood, remove_translated_files, scheduler, secret, security, storage, cache
+from libretranslate.campus_glossary import (
+    GlossaryRestoreError,
+    load_default_glossary,
+    protect_text,
+    restore_text,
+)
 from libretranslate.language import model2iso, iso2model, detect_languages, improve_translation_formatting, get_language_with_fallback
 from libretranslate.locales import (
     _,
@@ -101,6 +108,22 @@ def get_json_dict(request):
     if not isinstance(d, dict):
         abort(400, description=_("Invalid JSON format"))
     return d
+
+
+def parse_boolean_parameter(value, name):
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("true", "1", "yes", "on"):
+            return True
+        if normalized in ("false", "0", "no", "off", ""):
+            return False
+    raise ValueError(f"{name} must be a boolean")
 
 
 def get_fingerprint():
@@ -186,6 +209,11 @@ def detect_translatable(src_texts):
 def create_app(args):
     from libretranslate.init import boot
 
+    # Argos INFO messages contain source and translated text. Keep local MVP
+    # logs metadata-only unless an operator explicitly changes logger levels.
+    logging.getLogger("argostranslate").setLevel(logging.WARNING)
+    logging.getLogger("argostranslate.utils").setLevel(logging.WARNING)
+
     boot(args.load_only, args.update_models, args.force_update_models)
 
     from libretranslate.language import load_languages
@@ -197,6 +225,7 @@ def create_app(args):
 
     storage.setup(args.shared_storage)
     trans_cache = cache.setup(args.translation_cache)
+    campus_glossary = load_default_glossary()
 
     if not args.disable_files_translation:
         remove_translated_files.setup(get_upload_dir())
@@ -559,6 +588,29 @@ def create_app(args):
         """
         return jsonify({"status": "ok"})
 
+    @bp.get("/glossary/campus_zh_ru")
+    def campus_glossary_terms():
+        """Return the read-only MVP glossary with provenance and review state."""
+        return jsonify(
+            {
+                "profile": "campus_zh_ru",
+                "notice": "Demo entries are engineering samples, not official translations.",
+                "terms": [
+                    {
+                        "id": entry.id,
+                        "source": entry.source,
+                        "target": entry.target,
+                        "direction": entry.direction,
+                        "category": entry.category,
+                        "sourceRef": entry.source_ref,
+                        "status": entry.status,
+                        "updatedAt": entry.updated_at,
+                    }
+                    for entry in campus_glossary
+                ],
+            }
+        )
+
     # Add cors
     @bp.after_request
     def after_request(response):
@@ -626,6 +678,21 @@ def create_app(args):
             required: false
             description: Preferred number of alternative translations
           - in: formData
+            name: use_glossary
+            schema:
+              type: boolean
+              default: false
+            required: false
+            description: Apply the campus Chinese-Russian glossary to plain-text requests
+          - in: formData
+            name: glossary_profile
+            schema:
+              type: string
+              default: campus_zh_ru
+              enum: [campus_zh_ru]
+            required: false
+            description: Glossary profile used when use_glossary is true
+          - in: formData
             name: api_key
             schema:
               type: string
@@ -683,6 +750,22 @@ def create_app(args):
                         items:
                           type: string
                   description: Alternative translations
+                matchedTerms:
+                  oneOf:
+                    - type: array
+                      items:
+                        type: object
+                    - type: array
+                      items:
+                        type: array
+                        items:
+                          type: object
+                  description: Glossary matches, returned only when glossary enhancement is enabled
+                glossaryWarnings:
+                  type: array
+                  items:
+                    type: object
+                  description: Safe-fallback warnings when a placeholder cannot be restored
               required:
                 - translatedText
           400:
@@ -729,12 +812,24 @@ def create_app(args):
             target_lang = iso2model(json.get("target"))
             text_format = json.get("format")
             num_alternatives = int(json.get("alternatives", 0))
+            use_glossary_value = json.get("use_glossary", False)
+            glossary_profile = json.get("glossary_profile", "campus_zh_ru")
         else:
             q = request.values.get("q")
             source_lang = iso2model(request.values.get("source"))
             target_lang = iso2model(request.values.get("target"))
             text_format = request.values.get("format")
             num_alternatives = request.values.get("alternatives", 0)
+            use_glossary_value = request.values.get("use_glossary", False)
+            glossary_profile = request.values.get("glossary_profile", "campus_zh_ru")
+
+        try:
+            use_glossary = parse_boolean_parameter(use_glossary_value, "use_glossary")
+        except ValueError as exc:
+            abort(400, description=_("Invalid request: %(message)s", message=str(exc)))
+
+        if use_glossary and glossary_profile != "campus_zh_ru":
+            abort(400, description=_("Invalid request: unsupported glossary_profile"))
 
         if not q:
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='q'))
@@ -773,7 +868,7 @@ def create_app(args):
 
         ak = get_req_api_key()
         cache_key = None
-        if trans_cache.should_check(ak):
+        if not use_glossary and trans_cache.should_check(ak):
           cache_key, hit = trans_cache.hit(src_texts, source_lang, target_lang, text_format, num_alternatives)
           if hit is not None:
             return Response(hit, status=200, mimetype="application/json")
@@ -816,29 +911,100 @@ def create_app(args):
         if text_format not in ["text", "html"]:
             abort(400, description=_("%(format)s format is not supported", format=text_format))
 
+        if use_glossary and text_format != "text":
+            abort(400, description=_("Glossary enhancement currently supports text format only"))
+
         try:
+            def translate_plain_text(translator, text):
+                protected = protect_text(
+                    text,
+                    campus_glossary,
+                    src_lang.code,
+                    tgt_lang.code,
+                ) if use_glossary else None
+                translation_input = protected.text if protected is not None else text
+                hypotheses = translator.hypotheses(
+                    translation_input, num_alternatives + 1
+                )
+                values = [
+                    unescape(
+                        improve_translation_formatting(
+                            translation_input, hypothesis.value
+                        )
+                    )
+                    for hypothesis in hypotheses
+                ]
+
+                if protected is None or not protected.matches:
+                    return values[0], filter_unique(values[1:], values[0]), [], None
+
+                try:
+                    restored_values = [
+                        restore_text(value, protected) for value in values
+                    ]
+                    matches = [
+                        match.public_dict() for match in protected.matches
+                    ]
+                    return (
+                        restored_values[0],
+                        filter_unique(restored_values[1:], restored_values[0]),
+                        matches,
+                        None,
+                    )
+                except GlossaryRestoreError as exc:
+                    app.logger.warning(
+                        "Campus glossary placeholder restoration failed; source=%s target=%s matches=%d",
+                        src_lang.code,
+                        tgt_lang.code,
+                        len(protected.matches),
+                    )
+                    fallback_hypotheses = translator.hypotheses(
+                        text, num_alternatives + 1
+                    )
+                    fallback_values = [
+                        unescape(
+                            improve_translation_formatting(text, hypothesis.value)
+                        )
+                        for hypothesis in fallback_hypotheses
+                    ]
+                    return (
+                        fallback_values[0],
+                        filter_unique(fallback_values[1:], fallback_values[0]),
+                        [],
+                        {
+                            "code": "placeholder_restore_failed",
+                            "message": str(exc),
+                        },
+                    )
+
             if batch:
                 batch_results = []
                 batch_alternatives = []
+                batch_matched_terms = []
+                batch_glossary_warnings = []
                 for text in q:
                     translator = src_lang.get_translation(tgt_lang)
                     if translator is None:
                         abort(400, description=_("%(tname)s (%(tcode)s) is not available as a target language from %(sname)s (%(scode)s)", tname=_lazy(tgt_lang.name), tcode=tgt_lang.code, sname=_lazy(src_lang.name), scode=src_lang.code))
 
+                    matched_terms = []
+                    glossary_warning = None
                     if translatable:
                       if text_format == "html":
                           translated_text = unescape(str(translate_html(translator, text)))
                           alternatives = [] # Not supported for html yet
                       else:
-                          hypotheses = translator.hypotheses(text, num_alternatives + 1)
-                          translated_text = unescape(improve_translation_formatting(text, hypotheses[0].value))
-                          alternatives = filter_unique([unescape(improve_translation_formatting(text, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
+                          translated_text, alternatives, matched_terms, glossary_warning = translate_plain_text(translator, text)
                     else:
                       translated_text = text # Cannot translate, send the original text back
                       alternatives = []
+                      matched_terms = []
+                      glossary_warning = None
 
                     batch_results.append(translated_text)
                     batch_alternatives.append(alternatives)
+                    batch_matched_terms.append(matched_terms)
+                    batch_glossary_warnings.append(glossary_warning)
 
                 result = {"translatedText": batch_results}
 
@@ -846,6 +1012,10 @@ def create_app(args):
                     result["detectedLanguage"] = [model2iso(detected_src_lang)] * len(q)
                 if num_alternatives > 0:
                     result["alternatives"] = batch_alternatives
+                if use_glossary:
+                    result["matchedTerms"] = batch_matched_terms
+                    if any(batch_glossary_warnings):
+                        result["glossaryWarnings"] = batch_glossary_warnings
             else:
                 translator = src_lang.get_translation(tgt_lang)
                 if translator is None:
@@ -856,12 +1026,12 @@ def create_app(args):
                       translated_text = unescape(str(translate_html(translator, q)))
                       alternatives = [] # Not supported for html yet
                   else:
-                      hypotheses = translator.hypotheses(q, num_alternatives + 1)
-                      translated_text = unescape(improve_translation_formatting(q, hypotheses[0].value))
-                      alternatives = filter_unique([unescape(improve_translation_formatting(q, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
+                      translated_text, alternatives, matched_terms, glossary_warning = translate_plain_text(translator, q)
                 else:
                   translated_text = q # Cannot translate, send the original text back
                   alternatives = []
+                  matched_terms = []
+                  glossary_warning = None
 
                 result = {"translatedText": translated_text}
 
@@ -869,6 +1039,10 @@ def create_app(args):
                     result["detectedLanguage"] = model2iso(detected_src_lang)
                 if num_alternatives > 0:
                     result["alternatives"] = alternatives
+                if use_glossary:
+                    result["matchedTerms"] = matched_terms
+                    if glossary_warning:
+                        result["glossaryWarnings"] = [glossary_warning]
             
             if cache_key is not None:
               trans_cache.cache(cache_key, result)
