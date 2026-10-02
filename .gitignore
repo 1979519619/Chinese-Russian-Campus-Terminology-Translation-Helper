@@ -134,3 +134,10 @@ installed_models/
 # Misc
 api_keys.db
 suggestions.db
+
+# Campus MVP local runtime and verification outputs
+/.campus-mvp.local.json
+/runtime/
+/artifacts/verification/
+/*.bundle
+*.argosmodel

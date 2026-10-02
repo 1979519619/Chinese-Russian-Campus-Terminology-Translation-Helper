@@ -26,6 +26,11 @@ document.addEventListener('DOMContentLoaded', function(){
             translatedText: "",
             output: "",
             charactersLimit: -1,
+            useGlossary: false,
+            matchedTerms: [],
+            glossaryTerms: [],
+            glossaryBrowserOpen: false,
+            glossaryLoading: false,
 
             detectedLangText: "",
 
@@ -139,6 +144,8 @@ document.addEventListener('DOMContentLoaded', function(){
                     '		target: ' + this.$options.filters.escape(this.targetLang) + ',',
                     '		format: "' + (this.isHtml ? "html" : "text") + '",',
                     '		alternatives: 3,',
+                    '		use_glossary: ' + (this.useGlossary && this.glossaryAvailable) + ',',
+                    '		glossary_profile: "campus_zh_ru",',
                     '		api_key: "' + this.apiKey + '"',
                     '	}),',
                     '	headers: { "Content-Type": "application/json" }',
@@ -151,6 +158,15 @@ document.addEventListener('DOMContentLoaded', function(){
             },
             isHtml: function(){
                 return htmlRegex.test(this.inputText);
+            },
+            glossaryAvailable: function(){
+                var sourceIsChinese = this.sourceLang === "zh" || this.sourceLang === "zh-Hans";
+                var targetIsChinese = this.targetLang === "zh" || this.targetLang === "zh-Hans";
+                var sourceIsAuto = this.sourceLang === "auto";
+                return !this.isHtml && (
+                    ((sourceIsChinese || sourceIsAuto) && this.targetLang === "ru") ||
+                    ((this.sourceLang === "ru" || sourceIsAuto) && targetIsChinese)
+                );
             },
             canSendSuggestion: function(){
                 return this.translatedText.trim() !== "" && this.translatedText !== this.savedTanslatedText;
@@ -236,6 +252,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 this.timeout = null;
 
                 this.detectedLangText = "";
+                this.matchedTerms = [];
 
                 if (this.inputText === ""){
                     this.translatedText = "";
@@ -260,6 +277,8 @@ document.addEventListener('DOMContentLoaded', function(){
                     data.append("target", self.targetLang);
                     data.append("format", self.isHtml ? "html" : "text");
                     data.append("alternatives", 3);
+                    data.append("use_glossary", self.useGlossary && self.glossaryAvailable);
+                    data.append("glossary_profile", "campus_zh_ru");
                     data.append("api_key", self.apiKey);
                     if (self.apiSecret) data.append("secret", atob(self.apiSecret));
 
@@ -277,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             // Success!
                             if (res.translatedText !== undefined){
                                 self.translatedText = res.translatedText;
+                                self.matchedTerms = res.matchedTerms || [];
                                 self.loadingTranslation = false;
                                 self.output = JSON.stringify(res, null, 4);
                                 if(self.sourceLang == "auto" && res.detectedLanguage !== undefined){
@@ -372,7 +392,34 @@ document.addEventListener('DOMContentLoaded', function(){
             deleteText: function(e){
                 e.preventDefault();
                 this.inputText = this.translatedText = this.output = "";
+                this.matchedTerms = [];
                 this.$refs.inputTextarea.focus();
+            },
+            toggleGlossaryBrowser: function(e){
+                e.preventDefault();
+                this.glossaryBrowserOpen = !this.glossaryBrowserOpen;
+                if (!this.glossaryBrowserOpen || this.glossaryTerms.length) return;
+
+                var self = this;
+                self.glossaryLoading = true;
+                var request = new XMLHttpRequest();
+                request.open("GET", BaseUrl + "/glossary/campus_zh_ru", true);
+                request.onload = function(){
+                    try {
+                        if (this.status < 200 || this.status >= 400) throw new Error("无法加载术语表");
+                        var response = JSON.parse(this.response);
+                        self.glossaryTerms = response.terms || [];
+                    } catch (error) {
+                        self.error = error.message;
+                    } finally {
+                        self.glossaryLoading = false;
+                    }
+                };
+                request.onerror = function(){
+                    self.error = "无法加载术语表";
+                    self.glossaryLoading = false;
+                };
+                request.send();
             },
             switchType: function(type) {
                 this.translationType = type;

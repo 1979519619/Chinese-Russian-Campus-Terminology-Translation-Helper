@@ -213,6 +213,18 @@
 								</select>
 							</div>
 						</div>
+						<div class="row campus-glossary-controls" v-if="translationType === 'text'">
+							<div class="col s12">
+								<label class="campus-glossary-switch">
+									<input type="checkbox" v-model="useGlossary" @change="handleInput" :disabled="!glossaryAvailable || disableInput">
+									<span>校园术语库（中俄双向，默认关闭）</span>
+								</label>
+								<button type="button" class="btn-flat campus-glossary-browse" @click="toggleGlossaryBrowser">
+									[[ glossaryBrowserOpen ? '收起词表' : '浏览词表' ]]
+								</button>
+								<p class="campus-glossary-note">当前词条均为 demo 工程样例，不代表学校官方译法。</p>
+							</div>
+						</div>
 
 						<div class="row" v-if="translationType === 'text'">
 							<div class="input-field textarea-container col s12 m6">
@@ -250,6 +262,25 @@
 									<div class="progress translate" v-if="loadingTranslation">
 										<div class="indeterminate"></div>
 									</div>
+								</div>
+							</div>
+						</div>
+						<div class="row campus-glossary-panel" v-if="translationType === 'text' && useGlossary && matchedTerms.length">
+							<div class="col s12">
+								<h5>本次命中术语</h5>
+								<div class="campus-term-card" v-for="term in matchedTerms" :key="term.id">
+									<strong>[[ term.source ]] → [[ term.target ]]</strong>
+									<span>[[ term.category ]] · [[ term.status ]] · [[ term.sourceRef ]]</span>
+								</div>
+							</div>
+						</div>
+						<div class="row campus-glossary-panel" v-if="translationType === 'text' && glossaryBrowserOpen">
+							<div class="col s12">
+								<h5>只读校园术语表</h5>
+								<p v-if="glossaryLoading">正在加载……</p>
+								<div class="campus-term-card" v-for="term in glossaryTerms" :key="term.id">
+									<strong>[[ term.source ]] → [[ term.target ]]</strong>
+									<span>[[ term.direction ]] · [[ term.category ]] · [[ term.status ]]</span>
 								</div>
 							</div>
 						</div>
